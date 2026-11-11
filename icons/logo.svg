@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200" width="200" height="200">
+  <defs>
+    <!-- userSpaceOnUse: con objectBoundingBox le aste verticali (larghezza 0) non verrebbero disegnate -->
+    <linearGradient id="mte-g" gradientUnits="userSpaceOnUse" x1="0" y1="0" x2="120" y2="100">
+      <stop offset="0%" stop-color="#FF6B00"/>
+      <stop offset="50%" stop-color="#FF3D00"/>
+      <stop offset="100%" stop-color="#FF0058"/>
+    </linearGradient>
+  </defs>
+  <rect width="200" height="200" rx="44" fill="#0d0d0d"/>
+  <g transform="translate(40, 50)" fill="none" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M 0 0 L 0 100 M 0 0 L 60 70 L 120 0 M 120 0 L 120 100" stroke="url(#mte-g)" stroke-width="18"/>
+    <polyline points="48,82 60,94 72,82" stroke="#ffffff" stroke-width="8"/>
+  </g>
+</svg>

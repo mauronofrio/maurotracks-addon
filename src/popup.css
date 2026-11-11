@@ -1,0 +1,78 @@
+/* Tema scuro e chiaro */
+:root, [data-theme="dark"] {
+  --bg: #0d0d0d; --fg: #f0f0f0; --surface: #1a1a1a; --surface-2: #242424;
+  --border: #2a2a2a; --muted-fg: #888888; --input: #1f1f1f;
+}
+[data-theme="light"] {
+  --bg: #ffffff; --fg: #1a1a1a; --surface: #f5f5f5; --surface-2: #ebebeb;
+  --border: #e0e0e0; --muted-fg: #6b7280; --input: #f9f9f9;
+}
+:root { --brand: #FF6B00; --brand-dark: #E55A00; color-scheme: dark; }
+[data-theme="light"] { color-scheme: light; }
+
+* { box-sizing: border-box; }
+body {
+  width: 360px; margin: 0; background: var(--bg); color: var(--fg);
+  font: 13px/1.4 system-ui, -apple-system, "Segoe UI", sans-serif;
+}
+a { color: var(--brand); }
+
+.head { display: flex; align-items: center; gap: 8px; padding: 11px 12px; border-bottom: 1px solid var(--border); }
+.brand { font-weight: 800; font-size: 14.5px; letter-spacing: -0.2px; white-space: nowrap; }
+.brand b {
+  font-weight: 800; background: linear-gradient(135deg, #FF6B00, #FF0058);
+  -webkit-background-clip: text; background-clip: text; color: transparent;
+}
+.icon-btn {
+  width: 26px; height: 26px; display: flex; align-items: center; justify-content: center;
+  border: 1px solid var(--border); border-radius: 7px; background: none; color: var(--muted-fg); cursor: pointer; padding: 0;
+}
+.icon-btn:hover { color: var(--fg); background: var(--surface-2); }
+#dashboard { margin-left: auto; }
+[data-theme="dark"] .moon, [data-theme="light"] .sun { display: none; }
+
+main { padding: 12px; display: flex; flex-direction: column; gap: 11px; }
+.muted { color: var(--muted-fg); }
+.small { font-size: 11px; }
+
+.prod { display: flex; gap: 10px; align-items: center; }
+.prod img, .prod .ph { width: 48px; height: 48px; border-radius: 6px; flex: none; object-fit: contain; background: #fff; }
+.prod .ph { background: var(--surface-2); }
+.prod .title { font-weight: 600; line-height: 1.25; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+
+.label { font-size: 11px; font-weight: 600; margin-bottom: 5px; display: block; }
+.grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 4px; }
+.mk {
+  display: flex; align-items: center; gap: 5px; padding: 4px 6px; border: 1px solid var(--border); border-radius: 6px;
+  background: none; color: var(--muted-fg); font: inherit; font-size: 10.5px; white-space: nowrap; overflow: hidden; cursor: pointer; text-align: left;
+}
+.mk svg { width: 15px; height: 10px; flex: none; border-radius: 2px; box-shadow: 0 1px 2px rgba(0,0,0,.3); }
+.mk span { overflow: hidden; text-overflow: ellipsis; }
+.mk.on { border-color: var(--brand); background: rgba(255,107,0,.1); color: var(--brand); font-weight: 600; }
+.mk:disabled { opacity: .45; cursor: not-allowed; }
+
+.row { display: flex; gap: 8px; }
+.row > div { flex: 1; min-width: 0; }
+input[type="number"] {
+  width: 100%; padding: 6px 8px; border: 1px solid var(--border); border-radius: 7px;
+  background: var(--input); color: var(--fg); font: inherit;
+}
+input[type="number"]:focus { outline: 2px solid rgba(255,107,0,.4); border-color: var(--brand); }
+.check { display: flex; align-items: center; gap: 6px; font-size: 11px; color: var(--muted-fg); cursor: pointer; }
+.check input { accent-color: var(--brand); margin: 0; }
+
+.btn {
+  display: block; width: 100%; padding: 9px; border: 0; border-radius: 8px; background: var(--brand); color: #fff;
+  font: inherit; font-weight: 600; text-align: center; text-decoration: none; cursor: pointer;
+}
+.btn:hover { background: var(--brand-dark); }
+.btn:disabled { opacity: .5; cursor: not-allowed; }
+.error { color: #f87171; font-size: 11.5px; }
+.note { padding: 8px 10px; border-radius: 8px; background: var(--surface); border: 1px solid var(--border); }
+.note h2 { margin: 0 0 4px; font-size: 13px; }
+.tracked { margin: 4px 0 0; padding: 0; list-style: none; font-size: 11.5px; }
+.tracked li { display: flex; align-items: center; gap: 6px; padding: 2px 0; }
+.tracked svg { width: 15px; height: 10px; border-radius: 2px; flex: none; }
+.tracked span { flex: 1; min-width: 0; }
+.tracked a { margin-left: auto; white-space: nowrap; flex: none; }
+.center { text-align: center; }
