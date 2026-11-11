@@ -40,3 +40,8 @@ export function planChanges(tracked, rows) {
   const remove = tracked.filter((t) => !selected.has(t.marketplace)).map((t) => t.id);
   return { add, update, remove };
 }
+
+// "Stessa soglia per tutti i marketplace": una sola coppia di soglie per ogni marketplace selezionato.
+export function sharedRows(marketplaces, thresholds) {
+  return marketplaces.map((marketplace) => ({ marketplace, ...thresholds }));
+}

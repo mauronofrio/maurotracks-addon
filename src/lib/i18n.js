@@ -4,6 +4,8 @@ export const LOCALES = ["it", "en", "de", "fr", "es", "pt"];
 
 export const MESSAGES = {
   it: {
+    sameAllMarketplaces: "Stessa soglia per tutti i marketplace",
+    allMarketplaces: "Tutti i marketplace",
     editHint: "Lo stai già tracciando: puoi cambiare le soglie, aggiungere o togliere marketplace.",
     save: "Salva modifiche",
     saving: "Salvataggio…",
@@ -45,6 +47,8 @@ export const MESSAGES = {
     errNoMarketplace: "Seleziona almeno un marketplace.",
   },
   en: {
+    sameAllMarketplaces: "Same threshold for all marketplaces",
+    allMarketplaces: "All marketplaces",
     editHint: "You're already tracking it: you can change the thresholds, add or remove marketplaces.",
     save: "Save changes",
     saving: "Saving…",
@@ -86,6 +90,8 @@ export const MESSAGES = {
     errNoMarketplace: "Select at least one marketplace.",
   },
   de: {
+    sameAllMarketplaces: "Gleiche Schwelle für alle Marktplätze",
+    allMarketplaces: "Alle Marktplätze",
     editHint: "Du verfolgst es bereits: Du kannst die Schwellen ändern und Marktplätze hinzufügen oder entfernen.",
     save: "Änderungen speichern",
     saving: "Wird gespeichert…",
@@ -127,6 +133,8 @@ export const MESSAGES = {
     errNoMarketplace: "Wähle mindestens einen Marktplatz.",
   },
   fr: {
+    sameAllMarketplaces: "Même seuil pour toutes les marketplaces",
+    allMarketplaces: "Toutes les marketplaces",
     editHint: "Tu le suis déjà : tu peux modifier les seuils, ajouter ou retirer des marketplaces.",
     save: "Enregistrer les modifications",
     saving: "Enregistrement…",
@@ -168,6 +176,8 @@ export const MESSAGES = {
     errNoMarketplace: "Sélectionne au moins une marketplace.",
   },
   es: {
+    sameAllMarketplaces: "Mismo umbral para todos los marketplaces",
+    allMarketplaces: "Todos los marketplaces",
     editHint: "Ya lo estás siguiendo: puedes cambiar los umbrales, añadir o quitar marketplaces.",
     save: "Guardar cambios",
     saving: "Guardando…",
@@ -209,6 +219,8 @@ export const MESSAGES = {
     errNoMarketplace: "Selecciona al menos un marketplace.",
   },
   pt: {
+    sameAllMarketplaces: "Mesmo limite para todos os marketplaces",
+    allMarketplaces: "Todos os marketplaces",
     editHint: "Já o estás a acompanhar: podes alterar os limites, adicionar ou remover marketplaces.",
     save: "Guardar alterações",
     saving: "A guardar…",

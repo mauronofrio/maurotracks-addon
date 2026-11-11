@@ -2,7 +2,7 @@ import { MARKETPLACES, parseAmazonUrl } from "./lib/amazon-url.js";
 import { pickLocale, t } from "./lib/i18n.js";
 import { decideView, errorView } from "./lib/view.js";
 import { applySuggestion } from "./lib/suggest.js";
-import { planChanges, toThresholds, validateRows } from "./lib/changes.js";
+import { planChanges, sharedRows, toThresholds, validateRows } from "./lib/changes.js";
 import { FLAG_SVG } from "./lib/flags.js";
 import { readProductPage } from "./page-reader.js";
 
@@ -194,9 +194,21 @@ function renderForm(ctx) {
     rows.set(tld, row);
   }
 
+  // "Stessa soglia per tutti i marketplace": una sola riga al posto di quelle per nazione
+  const allSame = el("input", { type: "checkbox" });
+  const shared = {
+    inNew: numberInput(`${t(locale, "thresholdNew")} ${t(locale, "allMarketplaces")}`),
+    inUsed: numberInput(`${t(locale, "thresholdUsed")} ${t(locale, "allMarketplaces")}`),
+  };
+  shared.node = el("div", { class: "trow" },
+    el("span", { class: "tname" }, el("span", {}, t(locale, "allMarketplaces"))), shared.inNew, el("span", { class: "col-used" }, shared.inUsed));
+
+  const order = () => MARKETPLACES.map((m) => m.tld).filter((tld) => selected.has(tld));
+
   function renderRows() {
-    const order = MARKETPLACES.map((m) => m.tld).filter((tld) => selected.has(tld));
-    rowsBox.replaceChildren(...(order.length ? [header] : []), ...order.map((tld) => rows.get(tld).node));
+    const list = order();
+    const body = allSame.checked ? [shared.node] : list.map((tld) => rows.get(tld).node);
+    rowsBox.replaceChildren(...(list.length ? [header, ...body] : []));
   }
 
   const grid = el("div", { class: "grid" });
@@ -222,6 +234,23 @@ function renderForm(ctx) {
   renderRows();
   updateSlots();
   same.addEventListener("change", () => rowsBox.classList.toggle("same", same.checked));
+  allSame.addEventListener("change", () => {
+    if (allSame.checked) {
+      // parte dai valori del primo marketplace selezionato
+      const first = rows.get(order()[0]);
+      if (first && !shared.inNew.value && !shared.inUsed.value) {
+        shared.inNew.value = first.inNew.value;
+        shared.inUsed.value = first.inUsed.value;
+      }
+    } else {
+      for (const r of rows.values()) {
+        r.inNew.value = shared.inNew.value;
+        r.inUsed.value = shared.inUsed.value;
+      }
+    }
+    error.hidden = true;
+    renderRows();
+  });
 
   const submit = el("button", { class: "btn", type: "submit" }, t(locale, mode === "edit" ? "save" : "add"));
   const actions = el("div", { class: "actions" }, submit);
@@ -272,19 +301,24 @@ function renderForm(ctx) {
   const form = el("form", { class: "stack" },
     el("div", {}, el("span", { class: "label" }, t(locale, "marketplaces")), grid, slots),
     rowsBox,
-    el("label", { class: "check" }, same, t(locale, "sameThreshold")),
+    el("div", { class: "checks" },
+      el("label", { class: "check" }, same, t(locale, "sameThreshold")),
+      el("label", { class: "check" }, allSame, t(locale, "sameAllMarketplaces"))),
     error, actions);
 
   form.addEventListener("submit", (e) => {
     e.preventDefault();
     error.hidden = true;
-    const values = MARKETPLACES.map((m) => m.tld).filter((tld) => selected.has(tld)).map((tld) => {
-      const r = rows.get(tld);
-      return { marketplace: tld, ...toThresholds({ new: r.inNew.value, used: r.inUsed.value }, same.checked) };
-    });
+    const values = allSame.checked
+      ? sharedRows(order(), toThresholds({ new: shared.inNew.value, used: shared.inUsed.value }, same.checked))
+      : order().map((tld) => {
+        const r = rows.get(tld);
+        return { marketplace: tld, ...toThresholds({ new: r.inNew.value, used: r.inUsed.value }, same.checked) };
+      });
     const invalid = validateRows(values);
     if (invalid) {
-      return fail(t(locale, invalid.error, { country: invalid.marketplace ? countryName(regionOf(invalid.marketplace)) : "" }));
+      const country = allSame.checked ? t(locale, "allMarketplaces") : invalid.marketplace ? countryName(regionOf(invalid.marketplace)) : "";
+      return fail(t(locale, invalid.error, { country }));
     }
     const plan = planChanges(status.tracked, values);
     if (!plan.add.length && !plan.update.length && !plan.remove.length) return fail(t(locale, "noChanges"));

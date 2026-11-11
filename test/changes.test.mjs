@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { planChanges, validateRows, toThresholds } from "../src/lib/changes.js";
+import { planChanges, validateRows, toThresholds, sharedRows } from "../src/lib/changes.js";
 
 const tracked = [
   { id: "a", marketplace: "it", thresholdNew: 1500, thresholdUsed: 1500 },
@@ -47,4 +47,12 @@ test("validateRows: almeno un marketplace e una soglia valida per riga", () => {
   ]), { error: "errRowThreshold", marketplace: "co.uk" });
   assert.deepEqual(validateRows([{ marketplace: "it", thresholdNew: -1, thresholdUsed: null }]),
     { error: "errRowThreshold", marketplace: "it" });
+});
+
+test("sharedRows: la stessa soglia per ogni marketplace selezionato", () => {
+  assert.deepEqual(sharedRows(["it", "co.uk"], { thresholdNew: 10, thresholdUsed: null }), [
+    { marketplace: "it", thresholdNew: 10, thresholdUsed: null },
+    { marketplace: "co.uk", thresholdNew: 10, thresholdUsed: null },
+  ]);
+  assert.deepEqual(sharedRows([], { thresholdNew: 10, thresholdUsed: 5 }), []);
 });
