@@ -2,7 +2,7 @@ import { MARKETPLACES, parseAmazonUrl } from "./lib/amazon-url.js";
 import { pickLocale, t } from "./lib/i18n.js";
 import { decideView, errorView } from "./lib/view.js";
 import { applySuggestion } from "./lib/suggest.js";
-import { planChanges, sharedRows, toThresholds, validateRows } from "./lib/changes.js";
+import { planChanges, sharedRows, startShared, toThresholds, validateRows } from "./lib/changes.js";
 import { FLAG_SVG } from "./lib/flags.js";
 import { readProductPage } from "./page-reader.js";
 
@@ -204,6 +204,18 @@ function renderForm(ctx) {
     el("span", { class: "tname" }, el("span", {}, t(locale, "allMarketplaces"))), shared.inNew, el("span", { class: "col-used" }, shared.inUsed));
 
   const order = () => MARKETPLACES.map((m) => m.tld).filter((tld) => selected.has(tld));
+  shared.auto = { new: "", used: "" };
+  // prodotto nuovo con la riga unica: prezzo suggerito del marketplace della pagina
+  async function suggestShared(tld) {
+    if (!tld) return;
+    const res = await api(`/api/products/suggest?asin=${encodeURIComponent(page.asin)}&marketplace=${encodeURIComponent(tld)}`)
+      .catch(() => null);
+    if (!res?.ok) return;
+    const n = applySuggestion(shared.inNew.value, shared.auto.new, res.body?.new ?? null);
+    const u = applySuggestion(shared.inUsed.value, shared.auto.used, res.body?.used ?? null);
+    shared.inNew.value = n.value; shared.auto.new = n.lastAuto;
+    shared.inUsed.value = u.value; shared.auto.used = u.lastAuto;
+  }
 
   function renderRows() {
     const list = order();
@@ -231,6 +243,16 @@ function renderForm(ctx) {
     grid.append(btn);
   }
   for (const tld of selected) addRow(tld);
+  if (startShared(status.tracked)) {
+    allSame.checked = true;
+    const first = status.tracked[0];
+    if (first) {
+      shared.inNew.value = priceField(first.thresholdNew);
+      shared.inUsed.value = priceField(first.thresholdUsed);
+    } else {
+      suggestShared(order()[0]);
+    }
+  }
   renderRows();
   updateSlots();
   same.addEventListener("change", () => rowsBox.classList.toggle("same", same.checked));

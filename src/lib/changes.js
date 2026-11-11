@@ -45,3 +45,9 @@ export function planChanges(tracked, rows) {
 export function sharedRows(marketplaces, thresholds) {
   return marketplaces.map((marketplace) => ({ marketplace, ...thresholds }));
 }
+
+// La casella "stessa soglia per tutti" parte spuntata, tranne quando il prodotto è già tracciato
+// con soglie diverse tra le nazioni: salvando, le renderebbe tutte uguali.
+export function startShared(tracked) {
+  return tracked.every((t) => same(t.thresholdNew, tracked[0].thresholdNew) && same(t.thresholdUsed, tracked[0].thresholdUsed));
+}

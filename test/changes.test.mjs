@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { planChanges, validateRows, toThresholds, sharedRows } from "../src/lib/changes.js";
+import { planChanges, validateRows, toThresholds, sharedRows, startShared } from "../src/lib/changes.js";
 
 const tracked = [
   { id: "a", marketplace: "it", thresholdNew: 1500, thresholdUsed: 1500 },
@@ -55,4 +55,14 @@ test("sharedRows: la stessa soglia per ogni marketplace selezionato", () => {
     { marketplace: "co.uk", thresholdNew: 10, thresholdUsed: null },
   ]);
   assert.deepEqual(sharedRows([], { thresholdNew: 10, thresholdUsed: 5 }), []);
+});
+
+test("startShared: spuntata per i prodotti nuovi e per soglie già uguali, non per soglie diverse", () => {
+  assert.equal(startShared([]), true);
+  assert.equal(startShared([{ marketplace: "it", thresholdNew: 10, thresholdUsed: null }]), true);
+  assert.equal(startShared([
+    { marketplace: "it", thresholdNew: 10, thresholdUsed: 5 },
+    { marketplace: "de", thresholdNew: "10.00", thresholdUsed: "5" },
+  ]), true);
+  assert.equal(startShared(tracked), false);
 });
