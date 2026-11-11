@@ -70,9 +70,17 @@ input[type="number"]:focus { outline: 2px solid rgba(255,107,0,.4); border-color
 .error { color: #f87171; font-size: 11.5px; }
 .note { padding: 8px 10px; border-radius: 8px; background: var(--surface); border: 1px solid var(--border); }
 .note h2 { margin: 0 0 4px; font-size: 13px; }
-.tracked { margin: 4px 0 0; padding: 0; list-style: none; font-size: 11.5px; }
-.tracked li { display: flex; align-items: center; gap: 6px; padding: 2px 0; }
-.tracked svg { width: 15px; height: 10px; border-radius: 2px; flex: none; }
-.tracked span { flex: 1; min-width: 0; }
-.tracked a { margin-left: auto; white-space: nowrap; flex: none; }
+.stack { display: flex; flex-direction: column; gap: 11px; }
+.trows { display: flex; flex-direction: column; gap: 5px; }
+.trow { display: grid; grid-template-columns: 1fr 92px 92px; gap: 6px; align-items: center; }
+.trows.same .trow { grid-template-columns: 1fr 92px; }
+.trows.same .col-used { display: none; }
+.thead .label { margin: 0; }
+.tname { display: flex; align-items: center; gap: 6px; font-size: 11.5px; min-width: 0; }
+.tname svg { width: 15px; height: 10px; border-radius: 2px; flex: none; box-shadow: 0 1px 2px rgba(0,0,0,.3); }
+.tname span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.actions { display: flex; flex-direction: column; gap: 6px; }
+.btn-ghost { background: none; border: 1px solid var(--border); color: var(--fg); }
+.btn-ghost:hover { background: var(--surface-2); }
+.btn-ghost.danger { color: #f87171; }
 .center { text-align: center; }

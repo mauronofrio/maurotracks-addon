@@ -1,13 +1,13 @@
 // ASIN e marketplace dall'indirizzo della scheda: nessuna richiesta ad Amazon.
 
 export const MARKETPLACES = Object.freeze([
-  { tld: "it", region: "IT", currency: "EUR" },
-  { tld: "de", region: "DE", currency: "EUR" },
-  { tld: "fr", region: "FR", currency: "EUR" },
-  { tld: "es", region: "ES", currency: "EUR" },
-  { tld: "co.uk", region: "GB", currency: "GBP" },
-  { tld: "com", region: "US", currency: "USD" },
-  { tld: "co.jp", region: "JP", currency: "JPY" },
+  { tld: "it", region: "IT" },
+  { tld: "de", region: "DE" },
+  { tld: "fr", region: "FR" },
+  { tld: "es", region: "ES" },
+  { tld: "co.uk", region: "GB" },
+  { tld: "com", region: "US" },
+  { tld: "co.jp", region: "JP" },
 ]);
 
 const URL_ASIN_REGEX = /(?:dp|gp\/product|product-reviews|ASIN)\/([A-Z0-9]{10})/i;

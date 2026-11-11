@@ -2,6 +2,7 @@ import { MARKETPLACES, parseAmazonUrl } from "./lib/amazon-url.js";
 import { pickLocale, t } from "./lib/i18n.js";
 import { decideView, errorView } from "./lib/view.js";
 import { applySuggestion } from "./lib/suggest.js";
+import { planChanges, toThresholds, validateRows } from "./lib/changes.js";
 import { FLAG_SVG } from "./lib/flags.js";
 import { readProductPage } from "./page-reader.js";
 
@@ -36,15 +37,6 @@ function countryName(region) {
     return new Intl.DisplayNames([locale], { type: "region" }).of(region) ?? region;
   } catch {
     return region;
-  }
-}
-
-function formatPrice(value, tld) {
-  const currency = MARKETPLACES.find((m) => m.tld === tld)?.currency ?? "EUR";
-  try {
-    return new Intl.NumberFormat(locale, { style: "currency", currency }).format(value);
-  } catch {
-    return `${value.toFixed(2)} ${currency}`;
   }
 }
 
@@ -120,12 +112,10 @@ function renderView(view, ctx) {
       return message(t(locale, "slotsFull"), linkButton(t(locale, "seePlans"), "/dashboard/billing"));
     case "maintenance":
       return message(t(locale, "maintenance"));
-    case "allTracked":
-      return show(productBlock(ctx), trackedNote(ctx.status.tracked, "alreadyTracking"));
     case "form":
       return renderForm(ctx);
     default:
-      return message(t(locale, "generic"));
+      return message(t(locale, "generic"), linkButton(t(locale, "goDashboard"), "/dashboard"));
   }
 }
 
@@ -137,125 +127,186 @@ function productBlock({ page, info }) {
     el("div", {}, el("div", { class: "title" }, info?.title ?? page.asin), el("div", { class: "muted small" }, meta.join(" · "))));
 }
 
-function thresholdText(item) {
-  const parts = [];
-  if (item.thresholdNew != null) parts.push(`${t(locale, "newLabel")} ${formatPrice(item.thresholdNew, item.marketplace)}`);
-  if (item.thresholdUsed != null) parts.push(`${t(locale, "usedLabel")} ${formatPrice(item.thresholdUsed, item.marketplace)}`);
-  return parts.join(" · ") || t(locale, "noThresholdSet");
+function doneView(ctx, titleKey, hintKey, path) {
+  show(productBlock(ctx),
+    el("div", { class: "note center" }, el("h2", {}, t(locale, titleKey)), el("p", { class: "muted small", style: "margin:0" }, t(locale, hintKey))),
+    linkButton(t(locale, path === "/dashboard" ? "goDashboard" : "viewProduct"), path));
 }
 
-function trackedNote(tracked, titleKey) {
-  const list = el("ul", { class: "tracked" });
-  for (const item of tracked) {
-    const region = MARKETPLACES.find((m) => m.tld === item.marketplace)?.region;
-    const link = el("a", { href: "#", onclick: (e) => { e.preventDefault(); openSite(`/dashboard/product/${item.id}`); } },
-      t(locale, "viewOnSite"));
-    list.append(el("li", {}, flag(region), el("span", {}, thresholdText(item)), link));
-  }
-  return el("div", { class: "note" }, el("h2", {}, t(locale, titleKey)), list);
+const regionOf = (tld) => MARKETPLACES.find((m) => m.tld === tld)?.region;
+const priceField = (v) => (v == null ? "" : Number(v).toFixed(2));
+
+// Riquadro di conferma dentro il popup (niente finestre di dialogo del browser).
+function confirmBox(text, onConfirm, onCancel) {
+  const box = el("div", { class: "note" }, el("p", { style: "margin:0 0 8px" }, text));
+  box.append(el("div", { class: "row" },
+    el("div", {}, el("button", { class: "btn btn-ghost", type: "button", onclick: onCancel }, t(locale, "cancel"))),
+    el("div", {}, el("button", { class: "btn", type: "button", onclick: onConfirm }, t(locale, "confirm")))));
+  return box;
 }
 
 function renderForm(ctx) {
-  const { page, status, disabled, preselected } = ctx;
-  const selected = [...preselected]; // ordine di selezione: il primo decide il suggerimento
-  const auto = { new: "", used: "" };
-  let suggestTimer = null;
+  const { page, status, mode, preselected } = ctx;
+  const tracked = new Map(status.tracked.map((x) => [x.marketplace, x]));
+  const selected = new Set(preselected);
+  const rows = new Map(); // marketplace → { node, inNew, inUsed, auto }
 
   const error = el("p", { class: "error", hidden: true });
+  const fail = (text) => { error.textContent = text; error.hidden = false; };
   const slots = el("div", { class: "muted small", style: "margin-top:5px" });
   const updateSlots = () => {
-    slots.textContent = t(locale, "slots", { selected: selected.length, free: Math.max(0, status.slots.max - status.slots.used) });
+    slots.textContent = t(locale, "slots", { selected: selected.size, free: Math.max(0, status.slots.max - status.slots.used) });
   };
+
+  const same = el("input", { type: "checkbox" });
+  const rowsBox = el("div", { class: "trows" });
+  const header = el("div", { class: "trow thead" }, el("span", {}),
+    el("span", { class: "label" }, t(locale, "thresholdNew")), el("span", { class: "label col-used" }, t(locale, "thresholdUsed")));
+
+  const numberInput = (label) => el("input", { type: "number", min: "0.01", step: "0.01", inputmode: "decimal", "aria-label": label });
+
+  async function suggest(tld, row) {
+    const res = await api(`/api/products/suggest?asin=${encodeURIComponent(page.asin)}&marketplace=${encodeURIComponent(tld)}`)
+      .catch(() => null);
+    if (!res?.ok || rows.get(tld) !== row) return;
+    const n = applySuggestion(row.inNew.value, row.auto.new, res.body?.new ?? null);
+    const u = applySuggestion(row.inUsed.value, row.auto.used, res.body?.used ?? null);
+    row.inNew.value = n.value; row.auto.new = n.lastAuto;
+    row.inUsed.value = u.value; row.auto.used = u.lastAuto;
+  }
+
+  function addRow(tld) {
+    const name = countryName(regionOf(tld));
+    const row = {
+      inNew: numberInput(`${t(locale, "thresholdNew")} ${name}`),
+      inUsed: numberInput(`${t(locale, "thresholdUsed")} ${name}`),
+      auto: { new: "", used: "" },
+    };
+    row.node = el("div", { class: "trow" },
+      el("span", { class: "tname" }, flag(regionOf(tld)), el("span", {}, name)), row.inNew, el("span", { class: "col-used" }, row.inUsed));
+    const cur = tracked.get(tld);
+    if (cur) {
+      row.inNew.value = priceField(cur.thresholdNew);
+      row.inUsed.value = priceField(cur.thresholdUsed);
+    } else {
+      suggest(tld, row);
+    }
+    rows.set(tld, row);
+  }
+
+  function renderRows() {
+    const order = MARKETPLACES.map((m) => m.tld).filter((tld) => selected.has(tld));
+    rowsBox.replaceChildren(...(order.length ? [header] : []), ...order.map((tld) => rows.get(tld).node));
+  }
 
   const grid = el("div", { class: "grid" });
   for (const m of MARKETPLACES) {
-    const isDisabled = disabled.includes(m.tld);
-    const btn = el("button", {
-      type: "button", class: `mk${selected.includes(m.tld) ? " on" : ""}`, disabled: isDisabled,
-      title: isDisabled ? t(locale, "alreadyTrackedHint") : `Amazon.${m.tld}`,
-    }, flag(m.region), el("span", {}, countryName(m.region)));
+    const btn = el("button", { type: "button", class: `mk${selected.has(m.tld) ? " on" : ""}`, title: `Amazon.${m.tld}` },
+      flag(m.region), el("span", {}, countryName(m.region)));
     btn.addEventListener("click", () => {
-      const i = selected.indexOf(m.tld);
-      if (i >= 0) selected.splice(i, 1);
-      else selected.push(m.tld);
-      btn.classList.toggle("on", i < 0);
+      if (selected.has(m.tld)) {
+        selected.delete(m.tld);
+        rows.delete(m.tld);
+      } else {
+        selected.add(m.tld);
+        addRow(m.tld);
+      }
+      btn.classList.toggle("on", selected.has(m.tld));
+      error.hidden = true;
       updateSlots();
-      scheduleSuggestion();
+      renderRows();
     });
     grid.append(btn);
   }
+  for (const tld of selected) addRow(tld);
+  renderRows();
   updateSlots();
+  same.addEventListener("change", () => rowsBox.classList.toggle("same", same.checked));
 
-  const numberInput = (id) => el("input", { id, type: "number", min: "0.01", step: "0.01", inputmode: "decimal" });
-  const inNew = numberInput("t-new");
-  const inUsed = numberInput("t-used");
-  const usedBox = el("div", {}, el("label", { class: "label", for: "t-used" }, t(locale, "thresholdUsed")), inUsed);
-  const same = el("input", { type: "checkbox" });
-  same.addEventListener("change", () => { usedBox.hidden = same.checked; });
+  const submit = el("button", { class: "btn", type: "submit" }, t(locale, mode === "edit" ? "save" : "add"));
+  const actions = el("div", { class: "actions" }, submit);
+  const stop = mode === "edit" ? el("button", { class: "btn btn-ghost danger", type: "button" }, t(locale, "stopTracking")) : null;
+  if (stop) actions.append(stop);
 
-  function scheduleSuggestion() {
-    clearTimeout(suggestTimer);
-    const mkt = selected[0];
-    if (!mkt) return;
-    suggestTimer = setTimeout(async () => {
-      const res = await api(`/api/products/suggest?asin=${encodeURIComponent(page.asin)}&marketplace=${encodeURIComponent(mkt)}`)
-        .catch(() => null);
-      if (!res?.ok || selected[0] !== mkt) return;
-      const n = applySuggestion(inNew.value, auto.new, res.body?.new ?? null);
-      const u = applySuggestion(inUsed.value, auto.used, res.body?.used ?? null);
-      inNew.value = n.value; auto.new = n.lastAuto;
-      inUsed.value = u.value; auto.used = u.lastAuto;
-    }, 300);
+  const busy = (on) => {
+    submit.disabled = on;
+    if (stop) stop.disabled = on;
+    submit.textContent = t(locale, on ? (mode === "edit" ? "saving" : "adding") : (mode === "edit" ? "save" : "add"));
+  };
+  const restoreActions = () => { actions.replaceChildren(submit, ...(stop ? [stop] : [])); };
+
+  // Esegue le operazioni una alla volta: prima le rimozioni (liberano slot), poi modifiche e aggiunte.
+  async function run(plan) {
+    busy(true);
+    const send = (path, method, body) => api(path, {
+      method, headers: { "Content-Type": "application/json" }, body: body ? JSON.stringify(body) : undefined,
+    }).catch(() => ({ status: 0, ok: false }));
+    const steps = [
+      ...plan.remove.map((id) => () => send(`/api/products/${encodeURIComponent(id)}`, "DELETE")),
+      ...plan.update.map((u) => () => send(`/api/products/${encodeURIComponent(u.id)}`, "PATCH",
+        { thresholdNew: u.thresholdNew, thresholdUsed: u.thresholdUsed })),
+      ...plan.add.map((a) => () => send("/api/products", "POST",
+        { input: page.asin, marketplaces: [a.marketplace], thresholdNew: a.thresholdNew, thresholdUsed: a.thresholdUsed })),
+    ];
+    for (const step of steps) {
+      const res = await step();
+      if (!res.ok) return renderView(errorView(res.status), ctx);
+    }
+    return true;
   }
 
-  const submit = el("button", { class: "btn", type: "submit" }, t(locale, "add"));
-  const form = el("form", {},
-    el("div", {}, el("span", { class: "label" }, t(locale, "marketplaces")), grid, slots),
-    el("div", { class: "row" },
-      el("div", {}, el("label", { class: "label", for: "t-new" }, t(locale, "thresholdNew")), inNew),
-      usedBox),
-    el("label", { class: "check" }, same, t(locale, "sameThreshold")),
-    error, submit);
-  form.style.cssText = "display:flex;flex-direction:column;gap:11px";
+  async function productPath(tld) {
+    const res = await api(statusPath(page)).catch(() => null);
+    const item = res?.ok ? res.body.tracked.find((x) => x.marketplace === tld) ?? res.body.tracked[0] : null;
+    return item ? `/dashboard/product/${item.id}` : "/dashboard";
+  }
 
-  form.addEventListener("submit", async (e) => {
+  async function apply(plan) {
+    if ((await run(plan)) !== true) return;
+    const first = MARKETPLACES.map((m) => m.tld).find((tld) => selected.has(tld));
+    const path = await productPath(first);
+    if (mode === "edit") doneView(ctx, "saved", "savedHint", path);
+    else doneView(ctx, "added", "addedHint", path);
+  }
+
+  const form = el("form", { class: "stack" },
+    el("div", {}, el("span", { class: "label" }, t(locale, "marketplaces")), grid, slots),
+    rowsBox,
+    el("label", { class: "check" }, same, t(locale, "sameThreshold")),
+    error, actions);
+
+  form.addEventListener("submit", (e) => {
     e.preventDefault();
-    const fail = (key) => { error.textContent = t(locale, key); error.hidden = false; };
-    if (selected.length === 0) return fail("errNoMarketplace");
-    if (!inNew.value && !(inUsed.value && !same.checked)) return fail("errNoThreshold");
     error.hidden = true;
-    submit.disabled = true;
-    submit.textContent = t(locale, "adding");
-    const thresholdNew = inNew.value ? parseFloat(inNew.value) : null;
-    const thresholdUsed = same.checked ? thresholdNew : inUsed.value ? parseFloat(inUsed.value) : null;
-    const res = await api("/api/products", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ input: page.asin, marketplaces: selected, thresholdNew, thresholdUsed }),
-    }).catch(() => ({ status: 0, ok: false, body: null }));
-    if (!res.ok) {
-      const view = errorView(res.status);
-      if (view !== "generic") return renderView(view, ctx);
-      submit.disabled = false;
-      submit.textContent = t(locale, "add");
-      return fail("generic");
+    const values = MARKETPLACES.map((m) => m.tld).filter((tld) => selected.has(tld)).map((tld) => {
+      const r = rows.get(tld);
+      return { marketplace: tld, ...toThresholds({ new: r.inNew.value, used: r.inUsed.value }, same.checked) };
+    });
+    const invalid = validateRows(values);
+    if (invalid) {
+      return fail(t(locale, invalid.error, { country: invalid.marketplace ? countryName(regionOf(invalid.marketplace)) : "" }));
     }
-    renderAdded(ctx, selected[0]);
+    const plan = planChanges(status.tracked, values);
+    if (!plan.add.length && !plan.update.length && !plan.remove.length) return fail(t(locale, "noChanges"));
+    if (!plan.remove.length) return apply(plan);
+    const removed = status.tracked.filter((x) => plan.remove.includes(x.id)).map((x) => countryName(regionOf(x.marketplace)));
+    actions.replaceChildren(confirmBox(t(locale, "confirmRemove", { list: removed.join(", ") }),
+      () => { restoreActions(); apply(plan); }, restoreActions));
+  });
+
+  stop?.addEventListener("click", () => {
+    error.hidden = true;
+    actions.replaceChildren(confirmBox(t(locale, "confirmStop"), async () => {
+      restoreActions();
+      const plan = { add: [], update: [], remove: status.tracked.map((x) => x.id) };
+      if ((await run(plan)) === true) doneView(ctx, "stopped", "stoppedHint", "/dashboard");
+    }, restoreActions));
   });
 
   const nodes = [productBlock(ctx)];
-  if (status.tracked.length > 0) nodes.push(trackedNote(status.tracked, "partialTracking"));
+  if (mode === "edit") nodes.push(el("p", { class: "muted small", style: "margin:0" }, t(locale, "editHint")));
   nodes.push(form);
   show(...nodes);
-  scheduleSuggestion();
-}
-
-async function renderAdded(ctx, firstMkt) {
-  const res = await api(statusPath(ctx.page)).catch(() => null);
-  const item = res?.ok ? res.body.tracked.find((x) => x.marketplace === firstMkt) : null;
-  show(productBlock(ctx),
-    el("div", { class: "note center" }, el("h2", {}, t(locale, "added")), el("p", { class: "muted small", style: "margin:0" }, t(locale, "addedHint"))),
-    linkButton(t(locale, "viewProduct"), item ? `/dashboard/product/${item.id}` : "/dashboard"));
 }
 
 // --- avvio ---
@@ -286,7 +337,7 @@ async function start() {
   locale = pickLocale(res.body.locale, navigator.language);
   applyHeaderTexts();
   const decision = decideView({ page, loggedIn: true, status: res.body });
-  const info = decision.view === "form" || decision.view === "allTracked" ? await readPage(tab.id) : null;
+  const info = decision.view === "form" ? await readPage(tab.id) : null;
   renderView(decision.view, { page, status: res.body, info, ...decision });
 }
 

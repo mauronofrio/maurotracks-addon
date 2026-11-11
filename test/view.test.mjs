@@ -13,15 +13,19 @@ test("decideView: priorità degli stati", () => {
   assert.equal(decideView({ page: null, loggedIn: true, status: null }).view, "notProduct");
   assert.equal(decideView({ page: null, loggedIn: false, status: null }).view, "login");
   assert.equal(decideView({ page, loggedIn: false, status: null }).view, "login");
-  assert.equal(decideView({ page, loggedIn: true, status: status(ALL) }).view, "allTracked");
   assert.equal(decideView({ page, loggedIn: true, status: status(ALL, false) }).view, "noNotification");
 });
 
-test("decideView: modulo con marketplace già tracciati disabilitati", () => {
-  assert.deepEqual(decideView({ page, loggedIn: true, status: status(["it"]) }),
-    { view: "form", disabled: ["it"], preselected: [] });
+test("decideView: prodotto nuovo → aggiunta con il marketplace della pagina", () => {
   assert.deepEqual(decideView({ page, loggedIn: true, status: status([]) }),
-    { view: "form", disabled: [], preselected: ["it"] });
+    { view: "form", mode: "add", preselected: ["it"] });
+});
+
+test("decideView: prodotto già tracciato → modifica con i suoi marketplace selezionati", () => {
+  assert.deepEqual(decideView({ page, loggedIn: true, status: status(["de"]) }),
+    { view: "form", mode: "edit", preselected: ["de"] });
+  assert.deepEqual(decideView({ page, loggedIn: true, status: status(ALL) }),
+    { view: "form", mode: "edit", preselected: ALL });
 });
 
 test("errorView", () => {
